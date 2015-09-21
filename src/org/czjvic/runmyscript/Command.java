@@ -5,11 +5,25 @@
  */
 package org.czjvic.runmyscript;
 
+import java.awt.Color;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.openide.cookies.LineCookie;
+import org.openide.filesystems.FileObject;
+import org.openide.filesystems.FileUtil;
+import org.openide.loaders.DataObject;
+import org.openide.loaders.DataObjectNotFoundException;
+import org.openide.text.Line;
 import org.openide.util.NbPreferences;
+import org.openide.windows.IOColorPrint;
 import org.openide.windows.IOProvider;
 import org.openide.windows.InputOutput;
+import org.openide.windows.OutputEvent;
+import org.openide.windows.OutputListener;
 import org.openide.windows.OutputWriter;
 
 /**
@@ -47,7 +61,7 @@ public class Command implements Runnable {
         //run process
         try {
             Process process = Runtime.getRuntime().exec(this.cmd, env);
-            inheritIO(process.getInputStream(), process.getErrorStream(), outputWindow.getOut());
+            inheritIO(process.getInputStream(), process.getErrorStream(), outputWindow);
         } catch (Exception ex) {
             ex.printStackTrace();
             outputWindow.getOut().println("Failed running command. Exception message: " + ex.getMessage());
@@ -63,24 +77,72 @@ public class Command implements Runnable {
      *
      * @return void
      */
-    private static void inheritIO(final InputStream outputStream, final InputStream errorStream, final OutputWriter dest) {
+    private static void inheritIO(final InputStream outputStream, final InputStream errorStream, final InputOutput dest) {
         new Thread(new Runnable() {
             public void run() {
 
                 StringBuilder sb = new StringBuilder();
+                
+                // match path followed with line and column
+                Pattern pathPattern = Pattern.compile("\\s*((?:[a-zA-Z]\\:){0,1}(?:[\\\\/].+){1,}):(\\d+):(\\d+)\\s*");
+                Matcher matcher = null;
 
                 Scanner sc = new Scanner(outputStream);
                 while (sc.hasNextLine()) {
                     String line = sc.nextLine();
                     sb.append(line);
-                    dest.println(line);
+                    matcher = pathPattern.matcher(line);
+                    
+                    if (matcher.matches()) {
+                        final String path = matcher.group(1);
+                        final Integer lineNumber = Integer.parseInt(matcher.group(2));
+                        final Integer columnNumber = Integer.parseInt(matcher.group(3));
+                        try {
+                            IOColorPrint.print(dest, line, new OutputListener() {
+
+                                @Override
+                                public void outputLineSelected(OutputEvent oe) {
+                                    // nothing to do
+                                }
+
+                                @Override
+                                public void outputLineAction(OutputEvent oe) {
+                                    File file = new File(path);
+                                    FileObject fobj = FileUtil.toFileObject(file);
+                                    DataObject dobj = null;
+                                    try {
+                                        dobj = DataObject.find(fobj);
+                                    } catch (DataObjectNotFoundException ex) {
+                                        ex.printStackTrace();
+                                    }
+                                    if (dobj != null) {
+                                        LineCookie lc = dobj.getLookup().lookup(LineCookie.class);
+                                        if (lc == null) {
+                                            return;
+                                        }
+                                        Line l = lc.getLineSet().getOriginal(lineNumber);
+                                        l.show(Line.ShowOpenType.OPEN, Line.ShowVisibilityType.NONE, columnNumber);
+                                    }
+                                }
+
+                                @Override
+                                public void outputLineCleared(OutputEvent oe) {
+                                    // nothing to do
+                                }
+                            }, false, Color.BLUE);
+                        } catch (IOException ex) {
+                            dest.getOut().println(ex.getMessage());
+                        }
+                    } else {
+                        dest.getOut().println(line);
+                    }
                 }
 
                 sc = new Scanner(errorStream);
                 while (sc.hasNextLine()) {
-                    dest.println(sc.nextLine());
+                    dest.getOut().println(sc.nextLine());
                 }
-                dest.println("Command successful finished.");
+                dest.getOut().println("Command successful finished.");
 
                 try {
                     //if xml parsing enabled, try to parse
@@ -88,7 +150,7 @@ public class Command implements Runnable {
                         OutputProcessor op = new OutputProcessor(sb.toString().trim());
                     }
                 } catch (Exception ex) {
-                    dest.println("XML parse failed. Exception message: " + ex.getMessage());
+                    dest.getOut().println("XML parse failed. Exception message: " + ex.getMessage());
                 }
 
             }
