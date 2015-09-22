@@ -112,17 +112,19 @@ public class Command implements Runnable {
                                     DataObject dobj = null;
                                     try {
                                         dobj = DataObject.find(fobj);
-                                    } catch (DataObjectNotFoundException ex) {
+										if (dobj != null) {
+											LineCookie lc = dobj.getLookup().lookup(LineCookie.class);
+											if (lc == null) {
+												return;
+											}
+											Line l = lc.getLineSet().getOriginal(lineNumber - 1);
+											l.show(Line.ShowOpenType.OPEN, Line.ShowVisibilityType.FOCUS, columnNumber - 1);
+										}
+									} catch (DataObjectNotFoundException ex) {
                                         ex.printStackTrace();
-                                    }
-                                    if (dobj != null) {
-                                        LineCookie lc = dobj.getLookup().lookup(LineCookie.class);
-                                        if (lc == null) {
-                                            return;
-                                        }
-                                        Line l = lc.getLineSet().getOriginal(lineNumber - 1);
-                                        l.show(Line.ShowOpenType.OPEN, Line.ShowVisibilityType.FOCUS, columnNumber - 1);
-                                    }
+                                    } catch (IndexOutOfBoundsException ex) {
+										// fail silently when line is unreachable
+									}
                                 }
 
                                 @Override
