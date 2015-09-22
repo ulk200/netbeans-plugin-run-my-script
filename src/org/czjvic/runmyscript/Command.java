@@ -121,7 +121,7 @@ public class Command implements Runnable {
                                             return;
                                         }
                                         Line l = lc.getLineSet().getOriginal(lineNumber);
-                                        l.show(Line.ShowOpenType.OPEN, Line.ShowVisibilityType.NONE, columnNumber);
+                                        l.show(Line.ShowOpenType.OPEN, Line.ShowVisibilityType.FOCUS, columnNumber);
                                     }
                                 }
 
