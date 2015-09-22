@@ -120,8 +120,8 @@ public class Command implements Runnable {
                                         if (lc == null) {
                                             return;
                                         }
-                                        Line l = lc.getLineSet().getOriginal(lineNumber);
-                                        l.show(Line.ShowOpenType.OPEN, Line.ShowVisibilityType.FOCUS, columnNumber);
+                                        Line l = lc.getLineSet().getOriginal(lineNumber - 1);
+                                        l.show(Line.ShowOpenType.OPEN, Line.ShowVisibilityType.FOCUS, columnNumber - 1);
                                     }
                                 }
 
